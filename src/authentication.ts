@@ -15,9 +15,9 @@ export const auth = (server: http.Server, wss: Websocket.Server) => {
                 return
             }
 
-            wss.handleUpgrade(request, socket, head, function done(ws) {
-                wss.emit('connection', ws, request)
-            })
+            // wss.handleUpgrade(request, socket, head, function done(ws) {
+            //     wss.emit('connection', ws, request)
+            // })
         })
     })
 }
