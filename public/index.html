@@ -10,17 +10,20 @@
 
 <body>
     <div>
-        <video id="self" controls autoplay style="width:300px;height:200px;border:1px solid grey"></video>
-        <video id="remote" controls autoplay style="width:300px;height:200px;border:1px solid grey"></video>
+        <!-- <audio id="self" autoplay style="width:300px;height:200px;border:1px solid grey"></audio> -->
+        <img src="https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/71fbb00b-be92-4757-8791-0aaae3cc055d/de8ttif-2d157ecb-c597-4432-9d8d-069df95b19c3.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvNzFmYmIwMGItYmU5Mi00NzU3LTg3OTEtMGFhYWUzY2MwNTVkXC9kZTh0dGlmLTJkMTU3ZWNiLWM1OTctNDQzMi05ZDhkLTA2OWRmOTViMTljMy5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.IVLksZ2GA4OgcPqdC-enFxXKet2404GvUtMabAbTaAc"
+            style="width:100px;height:100px;border-radius:50px;object-fit:cover;" id="profile">
+        <audio id="remote" autoplay style="width:300px;height:200px;border:1px solid grey"></audio>
     </div>
     <script>
-        console.log(navigator)
-        const socket = new WebSocket("wss://localhost:5005")
+        const socket = new WebSocket("wss://192.168.0.140:5005")
+        const user_id = Math.random()
+
         socket.onopen = () => {
             socket.send(JSON.stringify({
                 command: "connect",
                 roomId: 123,
-                user_id: Math.random()
+                user_id
             }))
             const configuration = {
                 iceServers: [{
@@ -33,19 +36,23 @@
             pc.onicecandidate = ({ candidate }) => socket.send(JSON.stringify({
                 command: "iceCandidateProposal",
                 ice: candidate,
-                roomId: 123
+                roomId: 123,
+                user_id
             }));
 
             // Let the "negotiationneeded" event trigger offer generation.
             pc.onnegotiationneeded = () => {
                 try {
-                    pc.setLocalDescription(pc.createOffer())
+                    pc.setLocalDescription(pc.createOffer({
+                        voiceActivityDetection: true
+                    }))
                         .then(() => {
                             // Send the offer to the other peer.
                             socket.send(JSON.stringify({
                                 command: "offer",
                                 sdp: pc.localDescription,
-                                roomId: 123
+                                roomId: 123,
+                                user_id
                             }));
                         })
                 } catch (err) {
@@ -55,7 +62,6 @@
 
             // Once remote track media arrives, show it in remote video element.
             pc.ontrack = (event) => {
-
                 const remoteView = document.getElementById("remote")
                 remoteView.srcObject = event.streams[0];
             };
@@ -65,16 +71,15 @@
                 // try {
                 // Get local stream, show it in self-view, and add it to be sent.
                 navigator.mediaDevices.getUserMedia({
-                    video: true
+                    audio: {
+                        echoCancellation: true
+                    }
                 })
                     .then(stream => {
-                        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-                        const selfView = document.getElementById("self")
-                        selfView.srcObject = stream;
+                        stream.getTracks().forEach((track) => {
+                            pc.addTrack(track, stream)
+                        });
                     })
-                // } catch (err) {
-                //     console.error(err);
-                // }
             })()
             socket.onmessage = ({ data }) => {
                 data = JSON.parse(data)
@@ -84,14 +89,23 @@
                     // console.log('got offer')
                     pc.setRemoteDescription(data.sdp)
                         .then(async () => {
-                            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                            await stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-                            pc.setLocalDescription(pc.createAnswer())
+                            const stream = await navigator.mediaDevices.getUserMedia({
+                                audio: {
+                                    echoCancellation: true
+                                }
+                            });
+                            await stream.getTracks().forEach((track) => {
+                                pc.addTrack(track, stream)
+                            });
+                            pc.setLocalDescription(pc.createAnswer({
+                                voiceActivityDetection: true
+                            }))
                                 .then(() => {
                                     socket.send(JSON.stringify({
                                         command: "answer",
                                         sdp: pc.localDescription,
-                                        roomId: 123
+                                        roomId: 123,
+                                        user_id
                                     }))
                                 })
                         })
